@@ -4,7 +4,7 @@
 Plataforma de ChatBot que usara Amazon Bedrock para poder interactuar con el modelo de Claude Sonnet 4.
 
 ## Stack Técnico
-- Frontend (SPA): React 19 + TypeScript + Vite 7 + Tailwind CSS + shadcn/ui
+- Frontend (SPA): React 19 + TypeScript + Vite 7 + Tailwind CSS + shadcn/ui + ai-sdk (ai-elements)
 - API (backend): Python 3.13
 
 ## Arquitectura
@@ -20,5 +20,5 @@ Plataforma de ChatBot que usara Amazon Bedrock para poder interactuar con el mod
 - `make apply` - crear/actualizar infraestructura
 
 ## Estándares del Proyecto
-- Se debe utilizar shadcn/ui de forma mandatoria para construir los componentes
+- Se debe utilizar shadcn/ui y ai-elements para el Chat y sus componentes 
 - Usar TypeScript estricto
