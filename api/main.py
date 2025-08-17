@@ -1,65 +1,79 @@
 import json
-import boto3
 import logging
 import os
-
-from botocore.exceptions import ClientError
+from typing import Dict, List, Any
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-bedrock_runtime = boto3.client('bedrock-runtime')
-
 def lambda_handler(event, context):
+    # Headers CORS estándar para todas las respuestas
+    cors_headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+        'Access-Control-Max-Age': '86400'
+    }
+    
     try:
         logger.info(f"Received event: {json.dumps(event)}")
+        logger.info(f"HTTP Method: {event.get('httpMethod')}")
+        logger.info(f"Headers: {event.get('headers', {})}")
         
-        if event.get('httpMethod') != 'POST':
+        # Manejar preflight OPTIONS request
+        http_method = event.get('httpMethod', '').upper()
+        if http_method == 'OPTIONS':
+            logger.info("Handling OPTIONS preflight request")
+            return {
+                'statusCode': 200,
+                'headers': cors_headers,
+                'body': ''
+            }
+        
+        if http_method != 'POST':
             return {
                 'statusCode': 405,
                 'headers': {
                     'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+                    **cors_headers
                 },
                 'body': json.dumps({'error': 'Method not allowed'})
             }
         
-        if event.get('httpMethod') == 'OPTIONS':
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Allow-Methods': 'POST, OPTIONS'
-                }
-            }
-        
         body = json.loads(event.get('body', '{}'))
-        message = body.get('message', '')
+        messages = body.get('messages', [])
         
-        if not message:
+        if not messages:
             return {
                 'statusCode': 400,
                 'headers': {
                     'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
+                    **cors_headers
                 },
-                'body': json.dumps({'error': 'Message is required'})
+                'body': json.dumps({'error': 'Messages array is required'})
             }
         
-        response = invoke_claude(message)
+        response_content = handle_chat_completion(messages)
         
         return {
             'statusCode': 200,
             'headers': {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                **cors_headers
             },
             'body': json.dumps({
-                'response': response,
-                'message': message
+                'choices': [{
+                    'message': {
+                        'role': 'assistant',
+                        'content': response_content
+                    },
+                    'finish_reason': 'stop'
+                }],
+                'usage': {
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0,
+                    'total_tokens': 0
+                }
             })
         }
         
@@ -69,14 +83,20 @@ def lambda_handler(event, context):
             'statusCode': 500,
             'headers': {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                **cors_headers
             },
             'body': json.dumps({'error': 'Internal server error'})
         }
 
-def invoke_claude(message):
+def handle_chat_completion(messages: List[Dict[str, str]]) -> str:
     try:
-        model_id = os.environ['BEDROCK_MODEL_ID']
+        import boto3
+        from botocore.exceptions import ClientError
+        
+        bedrock_runtime = boto3.client('bedrock-runtime')
+        model_id = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-5-sonnet-20241022-v2:0')
+        
+        last_message = messages[-1]['content'] if messages else ""
         
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
@@ -84,7 +104,7 @@ def invoke_claude(message):
             "messages": [
                 {
                     "role": "user",
-                    "content": message
+                    "content": last_message
                 }
             ]
         }
