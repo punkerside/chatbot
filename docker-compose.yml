@@ -1,0 +1,16 @@
+version: '3'
+services:
+  ui:
+    image: node:22
+    command: [ "npm", "run", "dev" ]
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./ui:/app
+      - ./passwd:/etc/passwd:ro
+    working_dir: /app
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      USER_ID: 1000

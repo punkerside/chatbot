@@ -5,5 +5,8 @@ terraform.tfstate
 terraform.tfstate.backup
 passwd
 *.zip
+.npm/
 node_modules/
 dist/
+package-lock.json
+.bash_history
