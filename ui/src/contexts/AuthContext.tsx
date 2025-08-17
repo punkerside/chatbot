@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { getCurrentUser, signIn, signOut, confirmSignIn, type AuthUser } from 'aws-amplify/auth'
+import { getCurrentUser, signIn, signOut, confirmSignIn, fetchAuthSession, type AuthUser } from 'aws-amplify/auth'
 
 interface AuthContextType {
   user: AuthUser | null
@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>
   confirmNewPassword: (newPassword: string) => Promise<void>
   logout: () => Promise<void>
+  getToken: () => Promise<string | null>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -74,8 +75,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const getToken = async (): Promise<string | null> => {
+    try {
+      const session = await fetchAuthSession()
+      return session.tokens?.idToken?.toString() || null
+    } catch (error) {
+      console.error('Token error:', error)
+      return null
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, needsNewPassword, login, confirmNewPassword, logout }}>
+    <AuthContext.Provider value={{ user, loading, needsNewPassword, login, confirmNewPassword, logout, getToken }}>
       {children}
     </AuthContext.Provider>
   )

@@ -290,8 +290,8 @@ resource "aws_api_gateway_method" "main" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
   resource_id   = aws_api_gateway_resource.main.id
   http_method   = "POST"
-  authorization = "NONE"
-  # authorizer_id = aws_api_gateway_authorizer.main.id
+  authorization = "COGNITO_USER_POOLS"
+  authorizer_id = aws_api_gateway_authorizer.main.id
 }
 
 resource "aws_api_gateway_integration" "main" {

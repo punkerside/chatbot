@@ -22,6 +22,7 @@ import { Loader } from '@/components/ai-elements/loader';
 import { GlobeIcon, MicIcon } from 'lucide-react';
 import { useState } from 'react';
 import { apiConfig } from '@/lib/ai';
+import { useAuth } from '@/contexts/AuthContext';
 
 const models = [
   { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet' },
@@ -39,6 +40,7 @@ export default function Chat() {
   const [model, setModel] = useState<string>(models[0].id);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { getToken } = useAuth();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,10 +57,17 @@ export default function Chat() {
     setIsLoading(true);
 
     try {
+      const token = await getToken();
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
       const response = await fetch(`${apiConfig.baseURL}/chatbot`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain'
+          'Content-Type': 'text/plain',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           messages: [
@@ -95,10 +104,10 @@ export default function Chat() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col">
-      <div className="flex-1 max-w-4xl mx-auto p-6 w-full">
-        <div className="flex flex-col h-full rounded-lg border p-4">
-          <Conversation className="flex-1">
+    <div className="h-full w-full flex flex-col max-w-4xl mx-auto p-6">
+      <div className="flex flex-col h-full">
+        <div className="flex-1 min-h-0 mb-4">
+          <Conversation className="h-full">
             <ConversationContent>
             {messages.map((message) => (
               <Message from={message.role} key={message.id}>
@@ -117,8 +126,10 @@ export default function Chat() {
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
+        </div>
 
-          <PromptInput onSubmit={handleSubmit} className="mt-4">
+        <div className="flex-shrink-0">
+          <PromptInput onSubmit={handleSubmit}>
             <PromptInputTextarea
               onChange={(e) => setInput(e.target.value)}
               value={input}

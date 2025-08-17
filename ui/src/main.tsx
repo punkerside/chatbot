@@ -8,10 +8,7 @@ import App from './App'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route path="/chatbot" element={<App />} />
-        <Route path="/" element={<Navigate to="/chatbot" replace />} />
-      </Routes>
+      <App />
     </BrowserRouter>
   </StrictMode>,
 )

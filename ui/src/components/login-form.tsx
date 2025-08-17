@@ -41,9 +41,6 @@ export function LoginForm({
       <Card>
         <CardHeader>
           <CardTitle>Login to your account</CardTitle>
-          <CardDescription>
-            Enter your username below to login to your account
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
@@ -58,7 +55,6 @@ export function LoginForm({
                 <Input
                   id="username"
                   type="text"
-                  placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
@@ -83,7 +79,7 @@ export function LoginForm({
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
+                Login
               </Button>
             </div>
             <div className="mt-4 text-center text-sm">
