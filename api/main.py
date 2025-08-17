@@ -76,7 +76,7 @@ def lambda_handler(event, context):
 
 def invoke_claude(message):
     try:
-        model_id = os.environ['CLAUDE_MODEL_ID']
+        model_id = os.environ['BEDROCK_MODEL_ID']
         
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",

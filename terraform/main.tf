@@ -130,7 +130,68 @@ resource "aws_lambda_function" "main" {
 
   environment {
     variables = {
-      BEDROCK_MODEL_ID = var.claude_model_id
+      BEDROCK_MODEL_ID = var.bedrock_model_id
     }
   }
+}
+
+resource "aws_api_gateway_rest_api" "main" {
+  name        = var.service
+
+  endpoint_configuration {
+    types = ["REGIONAL"]
+  }
+}
+
+resource "aws_api_gateway_resource" "main" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = var.service
+}
+
+resource "aws_api_gateway_method" "main" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.main.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "main" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.main.id
+  http_method             = aws_api_gateway_method.main.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.main.invoke_arn
+}
+
+resource "aws_api_gateway_deployment" "main" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+
+  triggers = {
+    redeploy = timestamp()
+  }
+
+  depends_on = [ 
+    aws_api_gateway_integration.main
+  ]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "main" {
+  deployment_id        = aws_api_gateway_deployment.main.id
+  rest_api_id          = aws_api_gateway_rest_api.main.id
+  stage_name           = "prd"
+  xray_tracing_enabled = false
+}
+
+resource "aws_lambda_permission" "main" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
 }
