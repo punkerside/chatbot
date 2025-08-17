@@ -5,3 +5,5 @@ terraform.tfstate
 terraform.tfstate.backup
 passwd
 *.zip
+node_modules/
+dist/
