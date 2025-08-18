@@ -16,23 +16,27 @@ import {
   PromptInputTextarea,
   PromptInputToolbar,
   PromptInputTools,
+  PromptInputAttachment,
 } from '@/components/ai-elements/prompt-input';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
-import { GlobeIcon, MicIcon } from 'lucide-react';
+import { GlobeIcon, MicIcon, ImageIcon } from 'lucide-react';
 import { useState } from 'react';
 import { apiConfig } from '@/lib/ai';
 import { useAuth } from '@/contexts/AuthContext';
 
 const models = [
-  { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet' },
-  { id: 'claude-3-opus', name: 'Claude 3 Opus' },
+  { id: 'claude-4-sonnet', name: 'Claude 4 Sonnet' }
 ];
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
-  content: string;
+  content: string | Array<{
+    type: 'text' | 'image';
+    text?: string;
+    image?: string;
+  }>;
 }
 
 export default function Chat() {
@@ -40,20 +44,51 @@ export default function Chat() {
   const [model, setModel] = useState<string>(models[0].id);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [attachments, setAttachments] = useState<Array<{ type: 'image'; url: string; file: File }>>([]);
   const { getToken } = useAuth();
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && attachments.length === 0) || isLoading) return;
+
+    // Convertir archivos a base64
+    const imagePromises = attachments.map(async (attachment) => {
+      return new Promise<{ type: 'image'; image: string }>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            type: 'image',
+            image: reader.result as string
+          });
+        };
+        reader.readAsDataURL(attachment.file);
+      });
+    });
+
+    const imageContents = await Promise.all(imagePromises);
+    
+    const messageContent: Array<{ type: 'text' | 'image'; text?: string; image?: string }> = [];
+    
+    if (input.trim()) {
+      messageContent.push({
+        type: 'text',
+        text: input.trim()
+      });
+    }
+    
+    messageContent.push(...imageContents);
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: messageContent.length === 1 && messageContent[0].type === 'text' 
+        ? messageContent[0].text! 
+        : messageContent,
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setAttachments([]);
     setIsLoading(true);
 
     try {
@@ -103,6 +138,26 @@ export default function Chat() {
     }
   };
 
+  const handleFileSelect = (files: FileList) => {
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+    
+    const newAttachments = imageFiles.map(file => ({
+      type: 'image' as const,
+      url: URL.createObjectURL(file),
+      file
+    }));
+    
+    setAttachments(prev => [...prev, ...newAttachments]);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => {
+      const attachment = prev[index];
+      URL.revokeObjectURL(attachment.url);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   return (
     <div className="h-full w-full flex flex-col max-w-4xl mx-auto p-6">
       <div className="flex flex-col h-full">
@@ -114,10 +169,28 @@ export default function Chat() {
                 <MessageContent>
                   {message.role === 'assistant' ? (
                     <Response>
-                      {message.content}
+                      {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
                     </Response>
                   ) : (
-                    message.content
+                    <div className="space-y-2">
+                      {typeof message.content === 'string' ? (
+                        <div>{message.content}</div>
+                      ) : (
+                        message.content.map((item, index) => (
+                          <div key={index}>
+                            {item.type === 'text' ? (
+                              <div>{item.text}</div>
+                            ) : item.type === 'image' ? (
+                              <img 
+                                src={item.image} 
+                                alt="Imagen enviada" 
+                                className="max-w-xs rounded-lg"
+                              />
+                            ) : null}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   )}
                 </MessageContent>
               </Message>
@@ -129,6 +202,29 @@ export default function Chat() {
         </div>
 
         <div className="flex-shrink-0">
+          {/* Preview de attachments */}
+          {attachments.length > 0 && (
+            <div className="mb-2 p-2 border rounded-lg">
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((attachment, index) => (
+                  <div key={index} className="relative">
+                    <img 
+                      src={attachment.url} 
+                      alt="Preview" 
+                      className="w-16 h-16 object-cover rounded"
+                    />
+                    <button
+                      onClick={() => removeAttachment(index)}
+                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <PromptInput onSubmit={handleSubmit}>
             <PromptInputTextarea
               onChange={(e) => setInput(e.target.value)}
@@ -138,6 +234,15 @@ export default function Chat() {
             />
             <PromptInputToolbar>
               <PromptInputTools>
+                <PromptInputAttachment
+                  accept="image/*"
+                  multiple
+                  onSelect={handleFileSelect}
+                >
+                  <PromptInputButton>
+                    <ImageIcon size={16} />
+                  </PromptInputButton>
+                </PromptInputAttachment>
                 <PromptInputButton>
                   <MicIcon size={16} />
                 </PromptInputButton>
@@ -164,7 +269,7 @@ export default function Chat() {
                 </PromptInputModelSelect>
               </PromptInputTools>
               <PromptInputSubmit 
-                disabled={!input.trim() || isLoading} 
+                disabled={(!input.trim() && attachments.length === 0) || isLoading} 
                 status={isLoading ? 'submitting' : 'ready'} 
               />
             </PromptInputToolbar>

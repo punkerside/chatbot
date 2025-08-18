@@ -223,3 +223,34 @@ export const PromptInputModelSelectValue = ({
 }: PromptInputModelSelectValueProps) => (
   <SelectValue className={cn(className)} {...props} />
 );
+
+export type PromptInputAttachmentProps = {
+  accept?: string;
+  multiple?: boolean;
+  onSelect?: (files: FileList) => void;
+  children: React.ReactNode;
+};
+
+export const PromptInputAttachment = ({
+  accept,
+  multiple,
+  onSelect,
+  children,
+}: PromptInputAttachmentProps) => {
+  return (
+    <div className="relative">
+      <input
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        onChange={(e) => {
+          if (e.target.files && onSelect) {
+            onSelect(e.target.files);
+          }
+        }}
+        className="absolute inset-0 opacity-0 cursor-pointer z-10"
+      />
+      {children}
+    </div>
+  );
+};

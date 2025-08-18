@@ -1,7 +1,8 @@
 import json
 import logging
 import os
-from typing import Dict, List, Any
+import base64
+from typing import Dict, List, Any, Union
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -88,7 +89,7 @@ def lambda_handler(event, context):
             'body': json.dumps({'error': 'Internal server error'})
         }
 
-def handle_chat_completion(messages: List[Dict[str, str]]) -> str:
+def handle_chat_completion(messages: List[Dict[str, Any]]) -> str:
     try:
         import boto3
         from botocore.exceptions import ClientError
@@ -96,17 +97,55 @@ def handle_chat_completion(messages: List[Dict[str, str]]) -> str:
         bedrock_runtime = boto3.client('bedrock-runtime')
         model_id = os.environ.get('BEDROCK_MODEL_ID', 'anthropic.claude-3-5-sonnet-20241022-v2:0')
         
-        last_message = messages[-1]['content'] if messages else ""
+        # Convertir mensajes al formato de Claude
+        claude_messages = []
+        for msg in messages:
+            claude_message = {
+                "role": msg["role"],
+                "content": []
+            }
+            
+            # Si el contenido es string simple
+            if isinstance(msg["content"], str):
+                claude_message["content"].append({
+                    "type": "text",
+                    "text": msg["content"]
+                })
+            # Si el contenido incluye imágenes
+            elif isinstance(msg["content"], list):
+                for item in msg["content"]:
+                    if item["type"] == "text":
+                        claude_message["content"].append({
+                            "type": "text",
+                            "text": item["text"]
+                        })
+                    elif item["type"] == "image":
+                        # Procesar imagen en base64
+                        image_data = item["image"]
+                        if image_data.startswith("data:"):
+                            # Extraer el tipo de imagen y los datos base64
+                            header, base64_data = image_data.split(",", 1)
+                            media_type = header.split(":")[1].split(";")[0]
+                        else:
+                            # Asumir que ya es base64 puro
+                            base64_data = image_data
+                            media_type = "image/jpeg"  # Por defecto
+                        
+                        claude_message["content"].append({
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": base64_data
+                            }
+                        })
+            
+            claude_messages.append(claude_message)
         
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
             "max_tokens": 1000,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": last_message
-                }
-            ]
+            "messages": claude_messages
         }
         
         response = bedrock_runtime.invoke_model(
