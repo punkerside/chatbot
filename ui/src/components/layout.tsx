@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { MessageSquare, LogOut, PanelLeftDashed } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { ModeToggle } from '@/components/mode-toggle';
 import {
   Sidebar,
   SidebarProvider,
@@ -98,7 +99,10 @@ export default function Layout({ children }: LayoutProps) {
           <AppSidebarContent />
         </Sidebar>
         
-        <SidebarInset className="flex-1">
+        <SidebarInset className="flex-1 relative">
+          <div className="absolute top-4 right-4 z-10">
+            <ModeToggle />
+          </div>
           <main className="h-full overflow-hidden">
             {children}
           </main>

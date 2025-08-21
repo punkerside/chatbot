@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "@/contexts/AuthContext"
+import { ThemeProvider } from "@/components/theme-provider"
 import LoginPage from "@/pages/login"
 import ChatBotPage from "@/pages/chatbot"
 
@@ -66,9 +67,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 
