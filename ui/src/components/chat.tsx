@@ -326,7 +326,11 @@ export default function Chat() {
                 </MessageContent>
               </Message>
             ))}
-              {isLoading && <Loader />}
+              {isLoading && (
+                <div className="flex justify-center">
+                  <Loader />
+                </div>
+              )}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
