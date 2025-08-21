@@ -13,7 +13,7 @@ apply:
 
 install:
 	@echo "${DOCKER_USER}:x:${DOCKER_UID}:${DOCKER_GID}::/app:/sbin/nologin" > passwd
-	@docker run --rm -u ${DOCKER_UID}:${DOCKER_GID} -v ${PWD}/passwd:/etc/passwd:ro -v ${PWD}/ui:/app -w /app node:22 npm install
+	@docker run --rm -u ${DOCKER_UID}:${DOCKER_GID} -v ${PWD}/passwd:/etc/passwd:ro -v ${PWD}/ui:/app -w /app node:22 npm ls | grep -E "(height|scroll|overflow)"
 
 shadcn:
 	@echo "${DOCKER_USER}:x:${DOCKER_UID}:${DOCKER_GID}::/app:/sbin/nologin" > passwd
@@ -23,4 +23,4 @@ up:
 	@docker compose up
 
 down:
-	@docker compose down
+	@docker compose downyes

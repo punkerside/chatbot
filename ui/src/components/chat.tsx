@@ -4,6 +4,7 @@ import {
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation';
 import { Message, MessageContent } from '@/components/ai-elements/message';
+import { Actions, Action } from '@/components/ai-elements/actions';
 import {
   PromptInput,
   PromptInputButton,
@@ -20,7 +21,8 @@ import {
 } from '@/components/ai-elements/prompt-input';
 import { Response } from '@/components/ai-elements/response';
 import { Loader } from '@/components/ai-elements/loader';
-import { GlobeIcon, MicIcon, ImageIcon } from 'lucide-react';
+import { CodeBlock, CodeBlockCopyButton } from '@/components/ai-elements/code-block';
+import { GlobeIcon, MicIcon, ImageIcon, RefreshCcwIcon, CopyIcon } from 'lucide-react';
 import { useState } from 'react';
 import { apiConfig } from '@/lib/ai';
 import { useAuth } from '@/contexts/AuthContext';
@@ -158,19 +160,148 @@ export default function Chat() {
     });
   };
 
+  const handleRegenerateMessage = async (messageIndex: number) => {
+    if (messageIndex < 0 || messageIndex >= messages.length) return;
+    
+    // Obtener todos los mensajes hasta el mensaje que queremos regenerar (excluyendo el último mensaje del asistente)
+    const messagesToResend = messages.slice(0, messageIndex);
+    
+    setMessages(messagesToResend);
+    setIsLoading(true);
+
+    try {
+      const token = await getToken();
+      
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      const response = await fetch(`${apiConfig.baseURL}/chatbot`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          messages: messagesToResend.map(msg => ({ role: msg.role, content: msg.content }))
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      const assistantMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: data.choices[0]?.message?.content || 'No response received',
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Regenerate error:', error);
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Error: No se pudo regenerar la respuesta',
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCopyMessage = (content: string | Array<any>) => {
+    const textToCopy = typeof content === 'string' ? content : JSON.stringify(content);
+    navigator.clipboard.writeText(textToCopy);
+  };
+
+  const parseMessageWithCodeBlocks = (content: string) => {
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    const parts: Array<{ type: 'text' | 'code'; content: string; language?: string }> = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      // Agregar texto antes del bloque de código
+      if (match.index > lastIndex) {
+        const textBefore = content.slice(lastIndex, match.index);
+        if (textBefore.trim()) {
+          parts.push({ type: 'text', content: textBefore });
+        }
+      }
+
+      // Agregar el bloque de código
+      const language = match[1] || 'text';
+      const code = match[2];
+      parts.push({ type: 'code', content: code, language });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Agregar texto restante después del último bloque de código
+    if (lastIndex < content.length) {
+      const textAfter = content.slice(lastIndex);
+      if (textAfter.trim()) {
+        parts.push({ type: 'text', content: textAfter });
+      }
+    }
+
+    // Si no hay bloques de código, devolver todo como texto
+    if (parts.length === 0) {
+      parts.push({ type: 'text', content });
+    }
+
+    return parts;
+  };
+
   return (
-    <div className="h-full w-full flex flex-col max-w-4xl mx-auto p-6">
-      <div className="flex flex-col h-full">
-        <div className="flex-1 min-h-0 mb-4">
-          <Conversation className="h-full">
-            <ConversationContent>
-            {messages.map((message) => (
+    <div className="flex flex-col max-w-4xl mx-auto p-6 min-h-0 flex-1">
+      <Conversation>
+          <ConversationContent>
+            {messages.map((message, messageIndex) => (
               <Message from={message.role} key={message.id}>
                 <MessageContent>
                   {message.role === 'assistant' ? (
-                    <Response>
-                      {typeof message.content === 'string' ? message.content : JSON.stringify(message.content)}
-                    </Response>
+                    <div>
+                      {typeof message.content === 'string' ? (
+                        <div className="space-y-4">
+                          {parseMessageWithCodeBlocks(message.content).map((part, partIndex) => (
+                            <div key={partIndex}>
+                              {part.type === 'code' ? (
+                                <CodeBlock
+                                  code={part.content}
+                                  language={part.language || 'text'}
+                                  showLineNumbers={true}
+                                >
+                                  <CodeBlockCopyButton />
+                                </CodeBlock>
+                              ) : (
+                                <Response>{part.content}</Response>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <Response>{JSON.stringify(message.content)}</Response>
+                      )}
+                      <Actions className="mt-2">
+                        <Action
+                          onClick={() => handleRegenerateMessage(messageIndex)}
+                          label="Regenerate"
+                        >
+                          <RefreshCcwIcon className="size-3" />
+                        </Action>
+                        <Action
+                          onClick={() => handleCopyMessage(message.content)}
+                          label="Copy"
+                        >
+                          <CopyIcon className="size-3" />
+                        </Action>
+                      </Actions>
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       {typeof message.content === 'string' ? (
@@ -196,12 +327,11 @@ export default function Chat() {
               </Message>
             ))}
               {isLoading && <Loader />}
-            </ConversationContent>
-            <ConversationScrollButton />
-          </Conversation>
-        </div>
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
-        <div className="flex-shrink-0">
+      <div className="flex-shrink-0">
           {/* Preview de attachments */}
           {attachments.length > 0 && (
             <div className="mb-2 p-2 border rounded-lg">
@@ -274,7 +404,6 @@ export default function Chat() {
               />
             </PromptInputToolbar>
           </PromptInput>
-        </div>
       </div>
     </div>
   );
